@@ -1,0 +1,46 @@
+{
+  "cards": [
+    {
+      "id": 1,
+      "name": "Shield Bearer",
+      "cost": 2,
+      "power": 3,
+      "ability": { "type": "GainPoints", "value": 2 }
+    },
+    {
+      "id": 2,
+      "name": "Sneaky Thief",
+      "cost": 3,
+      "power": 1,
+      "ability": { "type": "StealPoints", "value": 2 }
+    },
+    {
+      "id": 3,
+      "name": "Rampaging Allrounder",
+      "cost": 4,
+      "power": 4,
+      "ability": { "type": "DoublePower", "value": 2 }
+    },
+    {
+      "id": 4,
+      "name": "Scouting Scout",
+      "cost": 1,
+      "power": 0,
+      "ability": { "type": "DrawExtraCard", "value": 1 }
+    },
+    {
+      "id": 5,
+      "name": "Chaos Disruptor",
+      "cost": 3,
+      "power": 0,
+      "ability": { "type": "DiscardOpponentRandomCard", "value": 1 }
+    },
+    {
+      "id": 6,
+      "name": "Bombard",
+      "cost": 5,
+      "power": 2,
+      "ability": { "type": "DestroyOpponentCardInPlay", "value": 1 }
+    }
+  ]
+}
