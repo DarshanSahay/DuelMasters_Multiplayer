@@ -38,6 +38,7 @@ public class GameController : MonoBehaviour, IGameController
         yield return new WaitUntil(() => net.isFullySpawned);
 
         net.OnPlayerJoinedGame += PlayerJoinedGame;
+        net.OnGameStarted += OnGameStarted;
     }
 
     void OnDestroy()
@@ -48,11 +49,16 @@ public class GameController : MonoBehaviour, IGameController
 
     public void PlayerJoinedGame(PlayerID player)
     {
-        var msg = new NetMessage { action = "joinRequest", playerId = player.id.ToString() };
+        var msg = new NetMessage { action = NetAction.JoinRequest, playerId = player.id.ToString() };
         PlayerID newPlayer = msg.GetPurrPlayerID(player);
         msg.purrPlayer = newPlayer;
 
         StartCoroutine(WaitForNetwork(msg, newPlayer));
+    }
+
+    public void OnGameStarted()
+    {
+        ui.CloseWaitingForPlayersPanel();
     }
 
     public IEnumerator WaitForNetwork(NetMessage msg, PlayerID player)
@@ -69,34 +75,34 @@ public class GameController : MonoBehaviour, IGameController
 
         switch (msg.action)
         {
-            case "assignPlayerId":
+            case NetAction.AssignPlayerId:
                 localPlayerId = msg.playerId;
 
                 var join = new NetMessage
                 {
-                    action = "join",
+                    action = NetAction.Join,
                     playerId = localPlayerId
                 };
                 net.SendJsonToServer(JsonUtility.ToJson(join), sender);
                 break;
 
-            case "timer":
+            case NetAction.Timer:
                 ui.UpdateTimer(msg.timeLeft);
                 break;
 
-            case "gameState":
+            case NetAction.GameState:
                 ApplyFullState(msg.fullState);
                 break;
 
-            case "revealResult":
+            case NetAction.RevealResult:
                 ApplyRevealResult(msg);
                 break;
 
-            case "endMatch":
+            case NetAction.EndMatch:
                 ApplyEndMatch(msg);
                 break;
 
-            case "reconnectedFullState":
+            case NetAction.ReconnectedFullState:
                 ApplyFullState(msg.fullState);
                 break;
         }
@@ -220,7 +226,7 @@ public class GameController : MonoBehaviour, IGameController
 
         var msg = new NetMessage
         {
-            action = "revealCards",
+            action = NetAction.RevealCards,
             playerId = localPlayerId,
             cardIds = ids
         };
@@ -233,7 +239,7 @@ public class GameController : MonoBehaviour, IGameController
     {
         var msg = new NetMessage
         {
-            action = "requestFullState",
+            action = NetAction.RequestFullState,
             playerId = localPlayerId
         };
 

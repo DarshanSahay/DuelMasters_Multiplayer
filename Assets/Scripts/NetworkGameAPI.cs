@@ -12,6 +12,7 @@ public class NetworkGameAPI : NetworkBehaviour
     public PurrTransport Transport;
 
     public Action<PlayerID> OnPlayerJoinedGame;
+    public Action OnGameStarted;
     public Action<string, PlayerID> OnServerJson;
     public Action<string, PlayerID> OnClientJson;
     public NetworkManager NetworkManager;
@@ -70,7 +71,12 @@ public class NetworkGameAPI : NetworkBehaviour
         OnPlayerJoinedGame?.Invoke(player);
     }
 
-    public void SendJsonToServer(string json, PlayerID sender)
+    public void OnGameStartedEvent()
+    {
+        OnGameStarted.Invoke();
+    }
+
+public void SendJsonToServer(string json, PlayerID sender)
     {
         if(!isServer)
         {

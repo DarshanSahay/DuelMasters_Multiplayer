@@ -4,7 +4,7 @@ using System;
 [Serializable]
 public class NetMessage
 {
-    public string action;
+    public NetAction action;
     public string playerId;
     public int[] cardIds;
     public PlayerID purrPlayer;

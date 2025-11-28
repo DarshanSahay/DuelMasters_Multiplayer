@@ -64,7 +64,7 @@ public class HostGameManager : MonoBehaviour
     {
         var msg = JsonUtility.FromJson<NetMessage>(json);
 
-        if (msg == null || string.IsNullOrEmpty(msg.action))
+        if (msg == null || msg.action == NetAction.None)
         {
             Debug.LogWarning("Invalid JSON received on server: " + json);
             return;
@@ -72,23 +72,23 @@ public class HostGameManager : MonoBehaviour
 
         switch (msg.action)
         {
-            case "joinRequest":
+            case NetAction.JoinRequest:
                 StartCoroutine(AssignPlayerId(sender, msg.playerId));
                 break;
 
-            case "join":
+            case NetAction.Join:
                 HandleJoin(sender, msg.playerId);
                 break;
 
-            case "revealCards":
+            case NetAction.RevealCards:
                 HandleReveal(msg);
                 break;
 
-            case "endTurn":
+            case NetAction.EndTurn:
                 HandleEndTurn(msg);
                 break;
 
-            case "requestFullState":
+            case NetAction.RequestFullState:
                 HandleStateRequest(sender, msg.playerId);
                 break;
 
@@ -106,7 +106,7 @@ public class HostGameManager : MonoBehaviour
 
         var msg = new NetMessage
         {
-            action = "assignPlayerId",
+            action = NetAction.AssignPlayerId,
             playerId = assignedId
         };
 
@@ -147,6 +147,8 @@ public class HostGameManager : MonoBehaviour
             for (int i = 0; i < 3; i++)
                 p.DrawCard(loader.Cards[UnityEngine.Random.Range(0, loader.Cards.Count)]);
         }
+
+        net.OnGameStartedEvent();
 
         BroadcastGameState();
     }
@@ -243,7 +245,7 @@ public class HostGameManager : MonoBehaviour
 
         var revealMsg = new NetMessage
         {
-            action = "revealResult",
+            action = NetAction.RevealResult,
             turn = currentTurn,
             scores = ToScoreList(players),
             playedCards = ToPlayedCardsList(players)
@@ -305,7 +307,7 @@ public class HostGameManager : MonoBehaviour
 
         var msg = new NetMessage
         {
-            action = "gameState",
+            action = NetAction.GameState,
             fullState = state
         };
 
@@ -317,7 +319,7 @@ public class HostGameManager : MonoBehaviour
     {
         var msg = new NetMessage
         {
-            action = "timer",
+            action = NetAction.Timer,
             timeLeft = turnTimer
         };
 
@@ -355,7 +357,7 @@ public class HostGameManager : MonoBehaviour
 
         var msg = new NetMessage
         {
-            action = "reconnectedFullState",
+            action = NetAction.ReconnectedFullState,
             fullState = full
         };
 
@@ -367,7 +369,7 @@ public class HostGameManager : MonoBehaviour
     {
         var endMsg = new NetMessage
         {
-            action = "endMatch",
+            action = NetAction.EndMatch,
             turn = currentTurn,
             scores = ToScoreList(players),
             fullState = new FullGameState

@@ -15,6 +15,7 @@ public class GameUIManager : MonoBehaviour
     [Header("UX State Overlays")]
     [SerializeField] private GameObject waitingOverlay;
     [SerializeField] private GameObject inputBlocker;
+    [SerializeField] private GameObject playerWaitingOverlay;
 
     private IGameController game;
 
@@ -99,6 +100,11 @@ public class GameUIManager : MonoBehaviour
     {
         if (waitingOverlay != null)
             waitingOverlay.SetActive(show);
+    }
+
+    public void CloseWaitingForPlayersPanel()
+    {
+        playerWaitingOverlay.SetActive(false);
     }
 
     public void ShowEndScreen(int myScore, int opponentScore)
