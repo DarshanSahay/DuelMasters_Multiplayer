@@ -1,64 +1,78 @@
-🎮 Game Duel – Multiplayer Turn-Based Card Battler
+# Game Duel — Technical Overview
 
-A lightweight and fast-paced 1v1 multiplayer card duel game built in Unity, powered by PurrNet for networking and a clean JSON-driven card/ability system.
-The server is fully authoritative, ensuring consistent gameplay, zero cheating, and stable synchronization across clients.
+## Networking Solution
+The project uses PurrNet as an authoritative client–server networking layer.
 
-🚀 Features
+- The host runs the complete game state (hands, played cards, scores, turn flow, timer).
+- Clients communicate with the server using JSON messages via:
+  - OnServerJson (server receives events)
+  - OnClientJson (clients receive updates)
 
-⚡ Real-time online multiplayer using PurrNet's authoritative host model
+All turn resolution, scoring, and ability logic are computed server-side for full determinism.
 
-🎴 JSON-defined cards with cost, power, and flexible ability strings
+---
 
-🔥 Ability system powered by a factory pattern (easy to extend!)
+## JSON Usage for Cards and Abilities
+Card data is defined using JSON-like structures loaded through CardLoader.  
+Each card contains an ID, name, cost, power, and an ability string:
 
-♻️ Persistent hands & persistent played boards
+```json
+{
+  "Id": 12,
+  "Name": "Flame Burst",
+  "Cost": 2,
+  "Power": 3,
+  "Ability": "DestroyOpponentCardInPlay"
+}
+```
 
-⏱️ Server-managed turn timer
+Abilities are mapped using a factory pattern:
 
-📡 Full state resync for reconnecting players
+```csharp
+switch (card.Ability)
+{
+    case "DestroyOpponentCardInPlay":
+        return new DestroyOpponentCardInPlayEffect(card);
+    case "DiscardOpponentRandom":
+        return new DiscardOpponentRandomEffect(card);
+    default:
+        return new NoEffect(card);
+}
+```
 
-🏁 End-match summary with clean UI hooks
+This makes the ability system data-driven and easy to extend.
 
-🎨 Designed to be lightweight, predictable, and easy to modify
+---
 
+## Running and Testing the Game
 
-📡 Networking Architecture (PurrNet)
+### 1. Start the Host (Server)
+1. Open Unity.
+2. Load the main game scene.
+3. Press Play — the Unity Editor becomes the authoritative server.
 
-This project uses PurrNet – a simple and fast client-server networking solution.
+### 2. Start a Client
+1. Build the project.
+2. Launch the build — it automatically performs the JSON handshake:
+   { "action": "joinRequest" }
 
-🔄 Gameplay Flow
-Start of Match
+### 3. Play and Verify Game Flow
+- Players start with 3 cards.
+- Ending a turn sends:
+  { "action": "revealCards", "cardIds": [...] }
+- The server resolves:
+  - card abilities
+  - scoring
+  - cost validation
+  - +1 card draw per turn
+- Played cards persist on the board.
+- Hands stay synced from the server.
 
-Server assigns each player a unique ID
+### 4. Reconnect Testing
+Client requests a full state sync with:
+{ "action": "requestFullState" }
 
-Each player receives 3 starting cards
+Server responds with:
+{ "action": "reconnectedFullState", "fullState": ... }
 
-Every Turn
-
-Players choose cards to reveal
-
-Cards are removed from hand locally and added to the player's board
-
-Server validates cost and abilities
-
-Server resolves:
-
-destructive abilities
-
-normal abilities
-
-score increments
-
-Server draws +1 card for each player
-
-Server broadcasts next full state
-
-Played cards remain permanently on the board
-
-Hand persists correctly without duplication
-
-Turn Timer
-
-Server runs a 30s timer
-
-If expired → auto-resolve with empty reveal
+This restores board, hand, scores, and turn state.
