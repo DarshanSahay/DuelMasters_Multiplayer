@@ -149,6 +149,7 @@ GameObject:
   - component: {fileID: 2498587985869100660}
   - component: {fileID: 8075452362666255433}
   - component: {fileID: 2378926362016234574}
+  - component: {fileID: 3861537287469460234}
   m_Layer: 0
   m_Name: Deck Card
   m_TagString: Untagged
@@ -277,6 +278,22 @@ MonoBehaviour:
   powerText: {fileID: 3701380535773036531}
   artworkImage: {fileID: 2498587985869100660}
   button: {fileID: 8075452362666255433}
+--- !u!114 &3861537287469460234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1638874541382747453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbaab15491778784da794949d658832e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CardHoverEffect
+  hoverScale: 1
+  scaleDuration: 0.15
+  wobbleAmount: 3
+  wobbleSpeed: 0.15
 --- !u!1 &2535038651195631012
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class GameUIManager : MonoBehaviour
@@ -16,8 +18,12 @@ public class GameUIManager : MonoBehaviour
     [SerializeField] private GameObject waitingOverlay;
     [SerializeField] private GameObject inputBlocker;
     [SerializeField] private GameObject playerWaitingOverlay;
+    [SerializeField] private AbilityOverlay localOverlay;
+    [SerializeField] private AbilityOverlay opponentOverlay;
 
     private IGameController game;
+    private bool interactableHand = true;
+    private bool endTurnEnabled = false;
 
     void Start()
     {
@@ -76,10 +82,6 @@ public class GameUIManager : MonoBehaviour
         opponentArea.RenderPlayedCards(cards);
     }
 
-
-    private bool interactableHand = true;
-    private bool endTurnEnabled = false;
-
     public void SetHandInteractable(bool canInteract)
     {
         interactableHand = canInteract;
@@ -121,5 +123,36 @@ public class GameUIManager : MonoBehaviour
         }
         
         endGameView.SetGameEnd(myScore.ToString(), opponentScore.ToString(), status);
+    }
+
+    public IEnumerator PlayAbilitySequence(List<AbilityEvent> events, string localId)
+    {
+        var localEvents = events.Where(e => e.playerId == localId).ToList();
+        var opponentEvents = events.Where(e => e.playerId != localId).ToList();
+
+        if(localEvents.Count > 0)
+        {
+            localOverlay.gameObject.SetActive(true);
+            // 1. Play local abilities
+            foreach (var evt in localEvents)
+                localOverlay.Enqueue(evt.description);
+        }
+
+        yield return new WaitUntil(() => !localOverlay.isActiveAndEnabled);
+
+        // Optional delay
+        if (localEvents.Count > 0 && opponentEvents.Count > 0)
+            yield return new WaitForSeconds(0.25f);
+
+        if(opponentEvents.Count > 0)
+        {
+            opponentOverlay.gameObject.SetActive(true);
+
+            // 2. Play opponent abilities
+            foreach (var evt in opponentEvents)
+                opponentOverlay.Enqueue(evt.description);
+        }
+
+        yield return new WaitUntil(() => !opponentOverlay.isActiveAndEnabled);
     }
 }

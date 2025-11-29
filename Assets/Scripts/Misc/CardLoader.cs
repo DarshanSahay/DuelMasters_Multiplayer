@@ -85,6 +85,7 @@ public class Card : ICard
 {
     public int Id { get; }
     public string Name { get; }
+    public string Description { get; }
     public int Cost { get; }
     public int Power { get; }
     public Abilities Ability { get; }

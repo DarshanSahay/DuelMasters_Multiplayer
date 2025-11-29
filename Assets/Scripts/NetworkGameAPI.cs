@@ -76,7 +76,7 @@ public class NetworkGameAPI : NetworkBehaviour
         OnGameStarted.Invoke();
     }
 
-public void SendJsonToServer(string json, PlayerID sender)
+    public void SendJsonToServer(string json, PlayerID sender)
     {
         if(!isServer)
         {

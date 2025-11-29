@@ -9,8 +9,10 @@ public class PhotonManager : MonoBehaviourPunCallbacks
 {
     public static PhotonManager Instance;
 
+    private readonly string PHOTON_ID = "";
+
     public Action<List<RoomInfo>> OnRoomListUpdated;
-    private readonly Dictionary<string, RoomInfo> cachedRooms = new Dictionary<string, RoomInfo>();
+    private readonly Dictionary<string, RoomInfo> cachedRooms = new();
     [SerializeField] private string lobbyName = "DuelMasters";
     [SerializeField] private byte defaultMaxPlayers = 2;
 

@@ -1,9 +1,9 @@
-using System;
-using System.Collections.Generic;
-using UnityEngine;
-using System.Linq;
 using PurrNet;
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 public class HostGameManager : MonoBehaviour
 {
@@ -12,6 +12,8 @@ public class HostGameManager : MonoBehaviour
 
     private Dictionary<PlayerID, string> playerRefToId = new();
     private Dictionary<string, PlayerState> players = new();
+
+    private Dictionary<string, List<Card>> playedBoards = new();
 
     private Dictionary<string, int[]> reveals = new();
 
@@ -121,6 +123,7 @@ public class HostGameManager : MonoBehaviour
         {
             playerRefToId[sender] = playerId;
             players[playerId] = new PlayerState();
+            playedBoards[playerId] = new List<Card>();
             Debug.Log($"Player joined: {playerId}. Players now: {players.Keys.Count}");
         }
 
@@ -137,11 +140,18 @@ public class HostGameManager : MonoBehaviour
         foreach (var kv in players)
         {
             var p = kv.Value;
+            var pid = kv.Key;
 
             p.Score = 0;
             p.Hand.Clear();
             p.PlayedThisTurn.Clear();
             p.Flags_DrawExtra = 0;
+
+            // ensure playedBoards exists & is empty
+            if (!playedBoards.ContainsKey(pid))
+                playedBoards[pid] = new List<Card>();
+            else
+                playedBoards[pid].Clear();
 
             // Starting hand of 3 cards
             for (int i = 0; i < 3; i++)
@@ -155,7 +165,7 @@ public class HostGameManager : MonoBehaviour
 
     void HandleEndTurn(NetMessage msg)
     {
-        // needs implementation
+        // not used
     }
 
     void HandleReveal(NetMessage msg)
@@ -196,6 +206,27 @@ public class HostGameManager : MonoBehaviour
 
     void ResolveTurn()
     {
+        BuildPlayedCardLists();
+
+        List<AbilityEvent> abilityEvents = new List<AbilityEvent>();
+
+        MoveRevealedCardsToBoard();
+
+        ApplyDestructiveAbilities(abilityEvents);
+        ApplyNormalAbilities(abilityEvents);
+
+        ApplyPowerToScore();
+
+        ApplyExtraDraws();
+
+        BroadcastRevealResult(abilityEvents);
+
+        foreach (var kv in players)
+            ClearTransientTurnState(kv.Value);
+    }
+
+    void BuildPlayedCardLists()
+    {
         foreach (var kv in players)
         {
             string pid = kv.Key;
@@ -203,9 +234,9 @@ public class HostGameManager : MonoBehaviour
 
             state.PlayedThisTurn.Clear();
 
-            if (reveals.TryGetValue(pid, out var ids))
+            if (reveals.TryGetValue(pid, out var ids) && ids != null && ids.Length > 0)
             {
-                foreach (var id in ids)
+                foreach (int id in ids)
                 {
                     var card = loader.Cards.FirstOrDefault(c => c.Id == id);
                     if (card != null)
@@ -213,30 +244,115 @@ public class HostGameManager : MonoBehaviour
                 }
             }
         }
+    }
 
-        // Apply destructive abilities
+    void MoveRevealedCardsToBoard()
+    {
         foreach (var pid in players.Keys.ToList())
-            ApplyDestructiveAbilities(pid);
+        {
+            if (!reveals.TryGetValue(pid, out var ids) || ids == null || ids.Length == 0)
+                continue; // nothing to move for this player
 
-        // Apply normal abilities
+            var state = players[pid];
+            var board = playedBoards[pid];
+
+            foreach (int id in ids)
+            {
+                var cardInHand = state.Hand.FirstOrDefault(c => c.Id == id);
+
+                var card = cardInHand ?? loader.Cards.FirstOrDefault(c => c.Id == id);
+
+                if (card == null) continue;
+
+                if (cardInHand != null)
+                    state.Hand.Remove(cardInHand);
+
+                if (!board.Any(c => c.Id == card.Id))
+                    board.Add(card);
+            }
+        }
+    }
+
+    void ApplyDestructiveAbilities(List<AbilityEvent> abilityEvents)
+    {
         foreach (var pid in players.Keys.ToList())
-            ApplyNormalAbilities(pid);
+        {
+            var self = players[pid];
+            var opponent = players.First(k => k.Key != pid).Value;
 
-        // Apply power ? score
+            var destructives = self.PlayedThisTurn
+                .Select(c => new { Card = c, Effect = EffectFactory.CreateEffect(c) })
+                .Where(x => x.Effect is DestroyOpponentCardInPlayEffect ||
+                            x.Effect is DiscardOpponentRandomEffect)
+                .ToList();
+
+            foreach (var x in destructives)
+            {
+                x.Effect.Apply(self, opponent);
+
+                abilityEvents.Add(new AbilityEvent
+                {
+                    playerId = pid,
+                    cardId = x.Card.Id,
+                    abilityName = x.Card.Ability.ToString(),
+                    description = $"{x.Card.Name} — {x.Card.Description}"
+                });
+            }
+        }
+    }
+
+    void ApplyNormalAbilities(List<AbilityEvent> abilityEvents)
+    {
+        foreach (var pid in players.Keys.ToList())
+        {
+            var self = players[pid];
+            var opponent = players.First(k => k.Key != pid).Value;
+
+            var normals = self.PlayedThisTurn
+                .Select(c => new { Card = c, Effect = EffectFactory.CreateEffect(c) })
+                .Where(x => !(x.Effect is DestroyOpponentCardInPlayEffect) &&
+                            !(x.Effect is DiscardOpponentRandomEffect))
+                .ToList();
+
+            foreach (var x in normals)
+            {
+                x.Effect.Apply(self, opponent);
+
+                abilityEvents.Add(new AbilityEvent
+                {
+                    playerId = pid,
+                    cardId = x.Card.Id,
+                    abilityName = x.Card.Ability.ToString(),
+                    description = x.Card.Name + " - " + x.Card.Description
+                });
+            }
+        }
+    }
+
+    void ApplyPowerToScore()
+    {
         foreach (var kv in players)
         {
             var p = kv.Value;
             p.Score += p.PlayedThisTurn.Sum(c => c.Power);
         }
+    }
 
+    void ApplyExtraDraws()
+    {
         foreach (var kv in players)
         {
             var p = kv.Value;
+
             for (int i = 0; i < p.Flags_DrawExtra; i++)
                 p.DrawCard(loader.Cards[UnityEngine.Random.Range(0, loader.Cards.Count)]);
+
             p.Flags_DrawExtra = 0;
         }
+    }
 
+    void BroadcastRevealResult(List<AbilityEvent> abilityEvents)
+    {
         foreach (var kv in players)
         {
             var p = kv.Value;
@@ -248,48 +364,20 @@ public class HostGameManager : MonoBehaviour
             action = NetAction.RevealResult,
             turn = currentTurn,
             scores = ToScoreList(players),
-            playedCards = ToPlayedCardsList(players)
+            playedCards = ToPlayedCardsList(players),
+            abilityEvents = new AbilityEventList { list = abilityEvents.ToArray() }
         };
 
         string json = JsonUtility.ToJson(revealMsg);
-        net.BroadcastJsonToClients(json, revealMsg.purrPlayer);
 
-        foreach (var kv in players)
-            ClearTransientTurnState(kv.Value);
+        //net.BroadcastJsonToClients(json, revealMsg.purrPlayer);
+        net.BroadcastJsonToClients(json, net.localPlayer.Value);
     }
 
     void ClearTransientTurnState(PlayerState p)
     {
         p.PlayedThisTurn.Clear();
         p.Flags_DrawExtra = 0;
-    }
-
-    void ApplyDestructiveAbilities(string pid)
-    {
-        var self = players[pid];
-        var opponent = players.First(k => k.Key != pid).Value;
-
-        var destructives = self.PlayedThisTurn
-            .Select(c => EffectFactory.CreateEffect(c))
-            .Where(e => e is DestroyOpponentCardInPlayEffect || e is DiscardOpponentRandomEffect)
-            .ToList();
-
-        foreach (var e in destructives)
-            e?.Apply(self, opponent);
-    }
-
-    void ApplyNormalAbilities(string pid)
-    {
-        var self = players[pid];
-        var opponent = players.First(k => k.Key != pid).Value;
-
-        var normal = self.PlayedThisTurn
-            .Select(c => EffectFactory.CreateEffect(c))
-            .Where(e => !(e is DestroyOpponentCardInPlayEffect) && !(e is DiscardOpponentRandomEffect))
-            .ToList();
-
-        foreach (var e in normal)
-            e?.Apply(self, opponent);
     }
 
     void BroadcastGameState()
@@ -408,10 +496,13 @@ public class HostGameManager : MonoBehaviour
         int i = 0;
         foreach (var kv in players)
         {
+            var pid = kv.Key;
+            var board = playedBoards.ContainsKey(pid) ? playedBoards[pid] : new List<Card>();
+
             arr[i++] = new StringIntArrayPair
             {
-                key = kv.Key,
-                values = kv.Value.PlayedThisTurn.ConvertAll(c => c.Id).ToArray()
+                key = pid,
+                values = board.ConvertAll(c => c.Id).ToArray()
             };
         }
         return new StringIntArrayPairList { list = arr };
@@ -423,15 +514,16 @@ public class HostGameManager : MonoBehaviour
         int i = 0;
         foreach (var kv in players)
         {
+            var pid = kv.Key;
             arr[i++] = new PlayerEntry
             {
-                playerId = kv.Key,
+                playerId = pid,
                 state = new PlayerStateDTO
                 {
                     score = kv.Value.Score,
                     handCount = kv.Value.Hand.Count,
                     handCardIds = kv.Value.Hand.ConvertAll(c => c.Id).ToArray(),
-                    playedThisTurn = kv.Value.PlayedThisTurn.ConvertAll(c => c.Id).ToArray()
+                    playedThisTurn = (playedBoards.ContainsKey(pid) ? playedBoards[pid] : new List<Card>()).ConvertAll(c => c.Id).ToArray()
                 }
             };
         }

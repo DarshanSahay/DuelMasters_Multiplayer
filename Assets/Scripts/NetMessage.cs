@@ -13,8 +13,8 @@ public class NetMessage
 
     public StringIntPairList scores;  
     public StringIntArrayPairList playedCards;        
-
     public FullGameState fullState;
+    public AbilityEventList abilityEvents;
 
     public PlayerID GetPurrPlayerID(PlayerID player)
     {
@@ -39,4 +39,19 @@ public class PlayerStateDTO
     public int handCount;
     public int[] handCardIds;
     public int[] playedThisTurn;
+}
+
+[Serializable]
+public class AbilityEvent
+{
+    public string playerId;      // "P1" or "P2"
+    public int cardId;           // which card activated
+    public string abilityName;   // raw ability string ("DestroyCard", "DrawExtra", etc.)
+    public string description;   // final readable text for UI
+}
+
+[Serializable]
+public class AbilityEventList
+{
+    public AbilityEvent[] list;
 }

@@ -20,6 +20,8 @@ public class GameController : MonoBehaviour, IGameController
     private int maxCost = 1;
     private int currentCost = 0;
 
+    public PlayerID playerID;
+
 
     void Awake()
     {
@@ -76,14 +78,7 @@ public class GameController : MonoBehaviour, IGameController
         switch (msg.action)
         {
             case NetAction.AssignPlayerId:
-                localPlayerId = msg.playerId;
-
-                var join = new NetMessage
-                {
-                    action = NetAction.Join,
-                    playerId = localPlayerId
-                };
-                net.SendJsonToServer(JsonUtility.ToJson(join), sender);
+                AssignLocalPlayerID(msg, sender);
                 break;
 
             case NetAction.Timer:
@@ -106,6 +101,22 @@ public class GameController : MonoBehaviour, IGameController
                 ApplyFullState(msg.fullState);
                 break;
         }
+    }
+
+    void AssignLocalPlayerID(NetMessage msg, PlayerID sender)
+    {
+        localPlayerId = sender.id.ToString();
+        playerID = new(sender.id, false);
+
+        Debug.Log("This player is : " + sender);
+
+        var join = new NetMessage
+        {
+            action = NetAction.Join,
+            playerId = localPlayerId
+        };
+
+        net.SendJsonToServer(JsonUtility.ToJson(join), sender);
     }
 
     void ApplyFullState(FullGameState full)
@@ -164,6 +175,9 @@ public class GameController : MonoBehaviour, IGameController
         ui.UpdateTurn(msg.turn, 6);
         ui.ShowWaiting(false);
 
+        localPlayed.Clear();
+        ui.UpdateLocalPlayed(localPlayed);
+
         if (msg.scores != null && msg.scores.list != null)
         {
             foreach (var entry in msg.scores.list)
@@ -173,6 +187,14 @@ public class GameController : MonoBehaviour, IGameController
                 else
                     ui.opponentArea.SetScore(entry.value);
             }
+        }
+
+        if (msg.abilityEvents != null && msg.abilityEvents.list != null && msg.abilityEvents.list.Length > 0)
+        {
+            StartCoroutine(ui.PlayAbilitySequence(
+                msg.abilityEvents.list.ToList(),
+                localPlayerId
+            ));
         }
 
         if (msg.playedCards != null && msg.playedCards.list != null)
