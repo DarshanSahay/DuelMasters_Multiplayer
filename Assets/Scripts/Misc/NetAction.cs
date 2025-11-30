@@ -5,6 +5,7 @@ public enum NetAction
     JoinRequest,
     AssignPlayerId,
     Join,
+    GameStart,
     RevealCards,
     EndTurn,
     GameState,

@@ -18,6 +18,7 @@ public class PhotonManager : MonoBehaviourPunCallbacks
 
     [SerializeField] private GameObject creatingRoomOverlay;
     [SerializeField] private GameObject joiningLobbyOverlay;
+    [SerializeField] private GameObject joiningRoomOverlay;
     [SerializeField] private GameObject loadingOcverlay;
     [SerializeField] private GameObject browseScreen;
 
@@ -125,6 +126,7 @@ public class PhotonManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        joiningRoomOverlay.SetActive(true);
         PhotonNetwork.JoinRoom(roomName);
         Debug.Log("Attempting to join room: " + roomName);
     }
@@ -138,11 +140,13 @@ public class PhotonManager : MonoBehaviourPunCallbacks
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
         Debug.LogError($"CreateRoom failed: {message}");
+        creatingRoomOverlay.SetActive(false);
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
         Debug.LogWarning($"JoinRoom failed: {message}");
+        joiningRoomOverlay.SetActive(false);
     }
 
     public override void OnCreatedRoom()

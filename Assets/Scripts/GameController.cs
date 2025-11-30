@@ -7,21 +7,19 @@ using UnityEngine;
 public class GameController : MonoBehaviour, IGameController
 {
     [SerializeField] private GameUIManager ui;
-
     [SerializeField] private CardLoader loader;
-
     [SerializeField] private NetworkGameAPI net;
+
     [SerializeField] private string localPlayerId;
 
-    // Local state
     private List<Card> localHand = new();
     private List<Card> localPlayed = new();
 
     private int maxCost = 1;
     private int currentCost = 0;
 
+    // The PlayerID representing this client (used as purrPlayer when sending)
     public PlayerID playerID;
-
 
     void Awake()
     {
@@ -36,7 +34,6 @@ public class GameController : MonoBehaviour, IGameController
     IEnumerator Start()
     {
         yield return new WaitUntil(() => net.networkInitialized);
-
         yield return new WaitUntil(() => net.isFullySpawned);
 
         net.OnPlayerJoinedGame += PlayerJoinedGame;
@@ -51,11 +48,15 @@ public class GameController : MonoBehaviour, IGameController
 
     public void PlayerJoinedGame(PlayerID player)
     {
-        var msg = new NetMessage { action = NetAction.JoinRequest, playerId = player.id.ToString() };
-        PlayerID newPlayer = msg.GetPurrPlayerID(player);
-        msg.purrPlayer = newPlayer;
+        var msg = new JoinRequestMessage
+        {
+            action = NetAction.JoinRequest,
+            playerId = player.id.ToString()
+        };
 
-        StartCoroutine(WaitForNetwork(msg, newPlayer));
+        //msg.purrPlayer = player;
+
+        StartCoroutine(WaitForNetwork(msg, player));
     }
 
     public void OnGameStarted()
@@ -63,7 +64,7 @@ public class GameController : MonoBehaviour, IGameController
         ui.CloseWaitingForPlayersPanel();
     }
 
-    public IEnumerator WaitForNetwork(NetMessage msg, PlayerID player)
+    public IEnumerator WaitForNetwork(NetEnvelope msg, PlayerID player)
     {
         yield return new WaitUntil(() => net.isFullySpawned);
 
@@ -72,45 +73,57 @@ public class GameController : MonoBehaviour, IGameController
 
     void HandleClientJson(string json, PlayerID sender)
     {
-        var msg = JsonUtility.FromJson<NetMessage>(json);
-        if (msg == null) return;
+        var env = JsonUtility.FromJson<NetEnvelope>(json);
+        if (env == null) return;
 
-        switch (msg.action)
+        switch (env.action)
         {
             case NetAction.AssignPlayerId:
-                AssignLocalPlayerID(msg, sender);
+                var assign = JsonUtility.FromJson<AssignPlayerIdMessage>(json);
+                AssignLocalPlayerID(assign, sender);
                 break;
 
             case NetAction.Timer:
-                ui.UpdateTimer(msg.timeLeft);
+                var timer = JsonUtility.FromJson<TimerMessage>(json);
+                ui.UpdateTimer(timer.timeLeft);
+                break;
+
+            case NetAction.GameStart:
+                ui.CloseWaitingForPlayersPanel();
                 break;
 
             case NetAction.GameState:
-                ApplyFullState(msg.fullState);
+                var gs = JsonUtility.FromJson<GameStateMessage>(json);
+                ApplyFullState(gs.fullState);
                 break;
 
             case NetAction.RevealResult:
-                ApplyRevealResult(msg);
+                var rr = JsonUtility.FromJson<RevealResultMessage>(json);
+                ApplyRevealResult(rr);
                 break;
 
             case NetAction.EndMatch:
-                ApplyEndMatch(msg);
+                var em = JsonUtility.FromJson<EndMatchMessage>(json);
+                ApplyEndMatch(em);
                 break;
 
             case NetAction.ReconnectedFullState:
-                ApplyFullState(msg.fullState);
+                var rf = JsonUtility.FromJson<ReconnectedFullStateMessage>(json);
+                ApplyFullState(rf.fullState);
                 break;
+
         }
     }
 
-    void AssignLocalPlayerID(NetMessage msg, PlayerID sender)
+    void AssignLocalPlayerID(AssignPlayerIdMessage msg, PlayerID sender)
     {
-        localPlayerId = sender.id.ToString();
-        playerID = new(sender.id, false);
+        localPlayerId = msg.playerId;
+        playerID = new PlayerID(sender.id, false);
 
-        Debug.Log("This player is : " + sender);
+        Debug.Log("Assigned local player ID = " + localPlayerId);
 
-        var join = new NetMessage
+        // Send Join (confirm) to server
+        var join = new JoinMessage
         {
             action = NetAction.Join,
             playerId = localPlayerId
@@ -145,8 +158,8 @@ public class GameController : MonoBehaviour, IGameController
             {
                 ui.playerArea.SetScore(dto.score);
 
+                // Rebuild local hand from authoritative server state
                 localHand = new List<Card>();
-
                 if (dto.handCardIds != null)
                 {
                     foreach (var id in dto.handCardIds)
@@ -166,8 +179,7 @@ public class GameController : MonoBehaviour, IGameController
         }
     }
 
-
-    void ApplyRevealResult(NetMessage msg)
+    void ApplyRevealResult(RevealResultMessage msg)
     {
         currentCost = 0;
         ui.UpdateCostUI(currentCost, maxCost);
@@ -191,10 +203,7 @@ public class GameController : MonoBehaviour, IGameController
 
         if (msg.abilityEvents != null && msg.abilityEvents.list != null && msg.abilityEvents.list.Length > 0)
         {
-            StartCoroutine(ui.PlayAbilitySequence(
-                msg.abilityEvents.list.ToList(),
-                localPlayerId
-            ));
+            StartCoroutine(ui.PlayAbilitySequence(msg.abilityEvents.list.ToList(), localPlayerId));
         }
 
         if (msg.playedCards != null && msg.playedCards.list != null)
@@ -246,29 +255,17 @@ public class GameController : MonoBehaviour, IGameController
 
         var ids = localPlayed.Select(c => c.Id).ToArray();
 
-        var msg = new NetMessage
+        var msg = new RevealCardsMessage
         {
             action = NetAction.RevealCards,
             playerId = localPlayerId,
             cardIds = ids
         };
 
-        net.SendJsonToServer(JsonUtility.ToJson(msg), msg.purrPlayer);
+        net.SendJsonToServer(JsonUtility.ToJson(msg), playerID);
     }
 
-    // For reconnect button or auto rejoin
-    public void RequestFullState()
-    {
-        var msg = new NetMessage
-        {
-            action = NetAction.RequestFullState,
-            playerId = localPlayerId
-        };
-
-        net.SendJsonToServer(JsonUtility.ToJson(msg), msg.purrPlayer);
-    }
-
-    void ApplyEndMatch(NetMessage msg)
+    void ApplyEndMatch(EndMatchMessage msg)
     {
         ui.ShowWaiting(false);
         ui.SetHandInteractable(false);
@@ -288,7 +285,6 @@ public class GameController : MonoBehaviour, IGameController
             }
         }
 
-        // Tell UI to open your end screen
         ui.ShowEndScreen(myScore, opponentScore);
     }
 }

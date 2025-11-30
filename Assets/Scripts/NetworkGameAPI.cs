@@ -89,7 +89,7 @@ public class NetworkGameAPI : NetworkBehaviour
     [ServerRpc]
     void Rpc_ClientToServer(string json, PlayerID sender)
     {
-        Debug.Log($"Received JSON from client {sender.id}: {json}");
+        Debug.Log($"Received JSON from client - Server {sender.id}: {json}");
 
         OnServerJson?.Invoke(json, sender);
     }

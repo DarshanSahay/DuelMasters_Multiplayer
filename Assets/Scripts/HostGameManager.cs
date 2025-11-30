@@ -64,38 +64,41 @@ public class HostGameManager : MonoBehaviour
 
     void HandleJsonFromClient(string json, PlayerID sender)
     {
-        var msg = JsonUtility.FromJson<NetMessage>(json);
-
-        if (msg == null || msg.action == NetAction.None)
+        var env = JsonUtility.FromJson<NetEnvelope>(json);
+        if (env == null)
         {
-            Debug.LogWarning("Invalid JSON received on server: " + json);
+            Debug.LogWarning($"Invalid JSON from {sender}: {json}");
             return;
         }
 
-        switch (msg.action)
+        switch (env.action)
         {
             case NetAction.JoinRequest:
-                StartCoroutine(AssignPlayerId(sender, msg.playerId));
+                var joinReq = JsonUtility.FromJson<JoinRequestMessage>(json);
+                StartCoroutine(AssignPlayerId(sender, joinReq.playerId));
                 break;
 
             case NetAction.Join:
-                HandleJoin(sender, msg.playerId);
+                var joinMsg = JsonUtility.FromJson<JoinMessage>(json);
+                HandleJoin(sender, joinMsg.playerId);
                 break;
 
             case NetAction.RevealCards:
-                HandleReveal(msg);
+                var reveal = JsonUtility.FromJson<RevealCardsMessage>(json);
+                HandleReveal(reveal);
                 break;
 
             case NetAction.EndTurn:
-                HandleEndTurn(msg);
+                // Still need to implement
                 break;
 
             case NetAction.RequestFullState:
-                HandleStateRequest(sender, msg.playerId);
+                var req = JsonUtility.FromJson<JoinMessage>(json);
+                HandleStateRequest(sender, req.playerId);
                 break;
 
             default:
-                Debug.LogWarning("Unknown action on server: " + msg.action);
+                Debug.LogWarning($"Unknown NetAction: {env.action}");
                 break;
         }
     }
@@ -106,7 +109,7 @@ public class HostGameManager : MonoBehaviour
 
         string assignedId = id;
 
-        var msg = new NetMessage
+        var msg = new AssignPlayerIdMessage
         {
             action = NetAction.AssignPlayerId,
             playerId = assignedId
@@ -158,17 +161,25 @@ public class HostGameManager : MonoBehaviour
                 p.DrawCard(loader.Cards[UnityEngine.Random.Range(0, loader.Cards.Count)]);
         }
 
+        var msg = new NetEnvelope
+        {
+            action = NetAction.GameStart,
+        };
+
+        string json = JsonUtility.ToJson(msg);
+        net.BroadcastJsonToClients(json, net.localPlayer.Value);
+
         net.OnGameStartedEvent();
 
         BroadcastGameState();
     }
 
-    void HandleEndTurn(NetMessage msg)
-    {
-        // not used
-    }
+    //void HandleEndTurn(NetMessage msg)
+    //{
+    //    // not used
+    //}
 
-    void HandleReveal(NetMessage msg)
+    void HandleReveal(RevealCardsMessage msg)
     {
         if (!CostIsValid(msg.playerId, msg.cardIds))
         {
@@ -295,7 +306,7 @@ public class HostGameManager : MonoBehaviour
                     playerId = pid,
                     cardId = x.Card.Id,
                     abilityName = x.Card.Ability.ToString(),
-                    description = $"{x.Card.Name} — {x.Card.Description}"
+                    description = x.Card.Name + " - " + x.Card.Description
                 });
             }
         }
@@ -359,7 +370,7 @@ public class HostGameManager : MonoBehaviour
             p.DrawCard(loader.Cards[UnityEngine.Random.Range(0, loader.Cards.Count)]);
         }
 
-        var revealMsg = new NetMessage
+        var revealMsg = new RevealResultMessage
         {
             action = NetAction.RevealResult,
             turn = currentTurn,
@@ -393,25 +404,25 @@ public class HostGameManager : MonoBehaviour
             players = ToPlayerEntryList(players)
         };
 
-        var msg = new NetMessage
+        var msg = new GameStateMessage
         {
             action = NetAction.GameState,
             fullState = state
         };
 
         string json = JsonUtility.ToJson(msg);
-        net.BroadcastJsonToClients(json, msg.purrPlayer);
+        net.BroadcastJsonToClients(json, net.localPlayer.Value);
     }
 
     void BroadcastTimer()
     {
-        var msg = new NetMessage
+        var msg = new TimerMessage
         {
             action = NetAction.Timer,
             timeLeft = turnTimer
         };
 
-        net.BroadcastJsonToClients(JsonUtility.ToJson(msg), msg.purrPlayer);
+        net.BroadcastJsonToClients(JsonUtility.ToJson(msg), net.localPlayer.Value);
     }
 
     void ForceEndTurnForBothPlayers()
@@ -443,7 +454,7 @@ public class HostGameManager : MonoBehaviour
             players = ToPlayerEntryList(players)
         };
 
-        var msg = new NetMessage
+        var msg = new ReconnectedFullStateMessage
         {
             action = NetAction.ReconnectedFullState,
             fullState = full
@@ -455,7 +466,7 @@ public class HostGameManager : MonoBehaviour
 
     void EndMatch()
     {
-        var endMsg = new NetMessage
+        var endMsg = new EndMatchMessage
         {
             action = NetAction.EndMatch,
             turn = currentTurn,
@@ -469,7 +480,7 @@ public class HostGameManager : MonoBehaviour
         };
 
         string json = JsonUtility.ToJson(endMsg);
-        net.BroadcastJsonToClients(json, endMsg.purrPlayer);
+        net.BroadcastJsonToClients(json, net.localPlayer.Value);
 
         timerRunning = false;
         matchStarted = false;
@@ -521,7 +532,7 @@ public class HostGameManager : MonoBehaviour
                 state = new PlayerStateDTO
                 {
                     score = kv.Value.Score,
-                    handCount = kv.Value.Hand.Count,
+                    //handCount = kv.Value.Hand.Count,
                     handCardIds = kv.Value.Hand.ConvertAll(c => c.Id).ToArray(),
                     playedThisTurn = (playedBoards.ContainsKey(pid) ? playedBoards[pid] : new List<Card>()).ConvertAll(c => c.Id).ToArray()
                 }
