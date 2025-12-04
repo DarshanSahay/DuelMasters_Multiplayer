@@ -13,7 +13,8 @@ public class GameController : MonoBehaviour, IGameController
     [SerializeField] private string localPlayerId;
 
     private List<Card> localHand = new();
-    private List<Card> localPlayed = new();
+    [SerializeField] private List<Card> localPlayed = new();
+    [SerializeField] private List<Card> localPlayedThisTurn = new();
 
     private int maxCost = 1;
     private int currentCost = 0;
@@ -86,6 +87,10 @@ public class GameController : MonoBehaviour, IGameController
             case NetAction.Timer:
                 var timer = JsonUtility.FromJson<TimerMessage>(json);
                 ui.UpdateTimer(timer.timeLeft);
+                break;
+
+            case NetAction.TimerExpire:
+                AutoSendReveal();
                 break;
 
             case NetAction.GameStart:
@@ -179,6 +184,20 @@ public class GameController : MonoBehaviour, IGameController
         }
     }
 
+    public void AutoSendReveal()
+    {
+        var ids = localPlayedThisTurn.Select(c => c.Id).ToArray();
+
+        var msg = new RevealCardsMessage
+        {
+            action = NetAction.RevealCards,
+            playerId = localPlayerId,
+            cardIds = ids
+        };
+
+        net.SendJsonToServer(JsonUtility.ToJson(msg), playerID);
+    }
+
     void ApplyRevealResult(RevealResultMessage msg)
     {
         currentCost = 0;
@@ -186,9 +205,6 @@ public class GameController : MonoBehaviour, IGameController
 
         ui.UpdateTurn(msg.turn, 6);
         ui.ShowWaiting(false);
-
-        localPlayed.Clear();
-        ui.UpdateLocalPlayed(localPlayed);
 
         if (msg.scores != null && msg.scores.list != null)
         {
@@ -240,6 +256,7 @@ public class GameController : MonoBehaviour, IGameController
         currentCost += card.Cost;
         ui.UpdateCostUI(currentCost, maxCost);
 
+        localPlayedThisTurn.Add(card);
         localPlayed.Add(card);
         localHand.Remove(card);
 
@@ -253,7 +270,8 @@ public class GameController : MonoBehaviour, IGameController
         ui.SetEndTurnButtonActive(false);
         ui.ShowWaiting(true);
 
-        var ids = localPlayed.Select(c => c.Id).ToArray();
+        var ids = localPlayedThisTurn.Select(c => c.Id).ToArray();
+        localPlayedThisTurn.Clear();
 
         var msg = new RevealCardsMessage
         {

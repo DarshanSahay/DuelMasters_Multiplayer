@@ -41,14 +41,6 @@ public class AbilityOverlay : MonoBehaviour
     {
         abilityText.text = message;
 
-        //float startX = Screen.width * 0.6f;
-        //float endX = -Screen.width * 0.6f;
-
-        //textRect.anchoredPosition = new Vector2(startX, textRect.anchoredPosition.y);
-
-        //Tween swipe = textRect.DOAnchorPosX(endX, swipeDuration).SetEase(Ease.Linear);
-
-        //yield return swipe.WaitForCompletion();
         yield return new WaitForSeconds(holdDuration);
     }
 }

@@ -115,7 +115,7 @@ public class HostGameManager : MonoBehaviour
             playerId = assignedId
         };
 
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(2f);
 
         net.SendJsonToClient(sender, JsonUtility.ToJson(msg));
     }
@@ -219,7 +219,7 @@ public class HostGameManager : MonoBehaviour
     {
         BuildPlayedCardLists();
 
-        List<AbilityEvent> abilityEvents = new List<AbilityEvent>();
+        List<AbilityEvent> abilityEvents = new();
 
         MoveRevealedCardsToBoard();
 
@@ -289,6 +289,10 @@ public class HostGameManager : MonoBehaviour
         foreach (var pid in players.Keys.ToList())
         {
             var self = players[pid];
+
+            if (self.PlayedThisTurn.Count == 0)
+                continue;
+
             var opponent = players.First(k => k.Key != pid).Value;
 
             var destructives = self.PlayedThisTurn
@@ -297,8 +301,15 @@ public class HostGameManager : MonoBehaviour
                             x.Effect is DiscardOpponentRandomEffect)
                 .ToList();
 
+            if (destructives.Count == 0)
+                continue;
+
             foreach (var x in destructives)
             {
+                if (!self.PlayedThisTurn.Any(c => c.Id == x.Card.Id))
+                    continue;
+
+
                 x.Effect.Apply(self, opponent);
 
                 abilityEvents.Add(new AbilityEvent
@@ -306,7 +317,7 @@ public class HostGameManager : MonoBehaviour
                     playerId = pid,
                     cardId = x.Card.Id,
                     abilityName = x.Card.Ability.ToString(),
-                    description = x.Card.Name + " - " + x.Card.Description
+                    description = x.Card.Description
                 });
             }
         }
@@ -317,6 +328,10 @@ public class HostGameManager : MonoBehaviour
         foreach (var pid in players.Keys.ToList())
         {
             var self = players[pid];
+
+            if (self.PlayedThisTurn.Count == 0)
+                continue;
+            
             var opponent = players.First(k => k.Key != pid).Value;
 
             var normals = self.PlayedThisTurn
@@ -325,8 +340,14 @@ public class HostGameManager : MonoBehaviour
                             !(x.Effect is DiscardOpponentRandomEffect))
                 .ToList();
 
+            if (normals.Count == 0)
+                continue;
+
             foreach (var x in normals)
             {
+                if (!self.PlayedThisTurn.Any(c => c.Id == x.Card.Id))
+                    continue;
+
                 x.Effect.Apply(self, opponent);
 
                 abilityEvents.Add(new AbilityEvent
@@ -334,7 +355,7 @@ public class HostGameManager : MonoBehaviour
                     playerId = pid,
                     cardId = x.Card.Id,
                     abilityName = x.Card.Ability.ToString(),
-                    description = x.Card.Name + " - " + x.Card.Description
+                    description = x.Card.Description
                 });
             }
         }
@@ -381,7 +402,6 @@ public class HostGameManager : MonoBehaviour
 
         string json = JsonUtility.ToJson(revealMsg);
 
-        //net.BroadcastJsonToClients(json, revealMsg.purrPlayer);
         net.BroadcastJsonToClients(json, net.localPlayer.Value);
     }
 
@@ -429,20 +449,12 @@ public class HostGameManager : MonoBehaviour
     {
         Debug.Log("Timer ended — forcing reveal.");
 
-        foreach (var pid in players.Keys)
+        var msg = new AssignPlayerIdMessage
         {
-            if (!reveals.ContainsKey(pid))
-                reveals[pid] = new int[0];
-        }
+            action = NetAction.TimerExpire,
+        };
 
-        ResolveTurn();
-        reveals.Clear();
-        currentTurn++;
-
-        if (currentTurn > totalTurns)
-            EndMatch();
-        else
-            BroadcastGameState();
+        net.BroadcastJsonToClients(JsonUtility.ToJson(msg), net.localPlayer.Value);
     }
 
     void HandleStateRequest(PlayerID requester, string playerId)

@@ -7,6 +7,7 @@ public enum NetAction
     Join,
     GameStart,
     RevealCards,
+    TimerExpire,
     EndTurn,
     GameState,
     RevealResult,

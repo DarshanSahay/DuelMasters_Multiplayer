@@ -500,7 +500,7 @@ MonoBehaviour:
   abilityText: {fileID: 611409331}
   textRect: {fileID: 611409329}
   swipeDuration: 0.6
-  holdDuration: 1
+  holdDuration: 2
 --- !u!1 &169370889
 GameObject:
   m_ObjectHideFlags: 0
@@ -746,7 +746,7 @@ MonoBehaviour:
   abilityText: {fileID: 67036710}
   textRect: {fileID: 67036708}
   swipeDuration: 0.6
-  holdDuration: 1
+  holdDuration: 2
 --- !u!1 &199028284
 GameObject:
   m_ObjectHideFlags: 0
@@ -887,6 +887,7 @@ MonoBehaviour:
   loader: {fileID: 248783342}
   net: {fileID: 289037919}
   localPlayerId: 
+  localPlayed: []
 --- !u!1 &289037918
 GameObject:
   m_ObjectHideFlags: 0

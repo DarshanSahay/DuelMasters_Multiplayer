@@ -69,6 +69,7 @@ public class CardDefinition
 {
     public int id;
     public string name;
+    public string description;
     public int cost;
     public int power;
     public CardAbility ability;
@@ -95,6 +96,7 @@ public class Card : ICard
     {
         Id = cd.id;
         Name = cd.name;
+        Description = cd.description;
         Cost = cd.cost;
         Power = cd.power;
         Ability = CheckAbility(cd.ability?.type);
